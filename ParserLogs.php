@@ -85,10 +85,12 @@ class ParserLogs
      */
     private function parseLogLine($logLine)
     {
-        $pattern = "!.*\"(.+)\" (\d{3}) (\d+) \"(.+)\" \"(.+)\"!";
-        if (preg_match_all($pattern, $logLine, $allLogParams, PREG_SET_ORDER)) {
+        $pattern = "!.*\"(.+)\" (\d+) (\d+) \"(.+)\" \"(.+)\"!";
+
+        $currLine = $this->result["views"] + 1;
+        if (!preg_match_all($pattern, $logLine, $allLogParams, PREG_SET_ORDER)) {
             if (count($allLogParams[0]) != 6) {
-                throw new \Exception("Invalid number of log parameters in line {$this->result["views"]}\n");
+                throw new \Exception("Invalid number of log parameters in line {$currLine}\n");
             }
         }
         $logParams = array_slice($allLogParams[0], 1);
@@ -97,12 +99,12 @@ class ParserLogs
         $queryParams = explode(" ", $query);
 
         if (count($queryParams) != 3) {
-            throw new \Exception("Invalid number of query parameters in line {$this->result["views"]}\n");
+            throw new \Exception("Invalid number of query parameters in line {$currLine}\n");
         }
 
         $queryType = $queryParams[0];
         if (!in_array($queryType, ["POST", "GET"])) {
-            throw new \Exception("Invalid query type in line {$this->result["views"]}\n");
+            throw new \Exception("Invalid query type in line {$currLine}\n");
         }
 
         $url = $queryParams[1];
@@ -110,8 +112,8 @@ class ParserLogs
             $this->urls[] = $url;
 
         $statusCode = $logParams[1];
-        if (!is_numeric($statusCode) && strlen($statusCode) === 3) {
-            throw new \Exception("Server's status code is incorrect in line {$this->result["views"]}\n");
+        if (!is_numeric($statusCode) || strlen($statusCode) !== 3) {
+            throw new \Exception("Server's status code is incorrect in line {$currLine}\n");
         }
 
         if (key_exists($statusCode, $this->result["statusCodes"])) {
@@ -122,7 +124,7 @@ class ParserLogs
 
         $traffic = $logParams[2];
         if (!is_numeric($traffic)) {
-            throw new \Exception("Traffic value is not a number in line {$this->result["views"]}\n");
+            throw new \Exception("Traffic value is not a number in line {$currLine}\n");
         }
 
         if ($queryType === "POST")
