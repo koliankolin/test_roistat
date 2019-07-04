@@ -72,3 +72,23 @@ Create a parser of logs file. Example file is in access_log.
                    "301": 2
                }
            }
+
+## In cases of incorrect lines in log file:
+        // Total was created but errors were in the head of output
+
+        Server's status code is incorrect in line 12
+        {
+            "views": 15,
+            "urls": 5,
+            "traffic": 141448,
+            "crawlers": {
+                "Google": 2,
+                "Bing": 0,
+                "Baidu": 0,
+                "Yandex": 0
+            },
+            "statusCodes": {
+                "200": 13,
+                "301": 2
+            }
+        }
