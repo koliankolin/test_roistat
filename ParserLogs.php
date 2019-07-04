@@ -77,7 +77,7 @@ class ParserLogs
                     $this->parseLogLine($logLine);
                 } catch (\Exception $e) {
                     echo $e->getMessage();
-                    die;
+                    continue;
                 }
 
                 $this->result["views"] += 1;
