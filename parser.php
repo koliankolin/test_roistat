@@ -5,13 +5,63 @@
  */
 
 require_once "ParserLogs.php";
+require_once "ParserArgs.php";
 
-if (count($argv) > 1) {
-    $files = array_slice($argv, 1);
-} else {
-    echo 'Usage: php parser FILE_PATH' . PHP_EOL;
-    die();
+try {
+    $parserArgs = new Utils\ParserArgs();
+} catch (\Exception $e) {
+    die($e->getMessage());
 }
 
-$parser = new Logs\ParserLogs($files);
-$parser->getJson($files[0]);
+// hack: convert to opposite value coz if flag exists it's false by default
+$isNeedHelp = !$parserArgs->isHelp();
+if ($isNeedHelp) {
+    $helpMessage = $parserArgs->helpMessage();
+    die($helpMessage);
+}
+
+
+
+$fileNameLogs = $parserArgs->fileNameLogs();
+
+$parserLogs = new Logs\ParserLogs($fileNameLogs);
+try {
+    $jsonResult = $parserLogs->getJson();
+} catch (\Exception $e) {
+    die($e->getMessage());
+}
+
+
+
+$fileNameToSave = $parserArgs->fileNameToSave();
+
+if ($fileNameToSave !== '') {
+    try {
+        save($fileNameToSave, $jsonResult);
+    } catch (\Exception $e) {
+        die($e->getMessage());
+    }
+}
+
+// hack: convert to opposite value coz if flag exists it's false by default
+$resultIsPrint = !$parserArgs->isPrint();
+
+if ($resultIsPrint) {
+    print($jsonResult . PHP_EOL);
+}
+
+
+/**
+ * @param $fileNameToSave
+ * @param $json
+ * @return bool
+ * @throws Exception
+ */
+function save($fileNameToSave, $json)
+{
+    $status = file_put_contents($fileNameToSave, $json);
+    if ($status === false) {
+        throw new \Exception("Json wasn't written to file\n");
+    }
+    return true;
+}

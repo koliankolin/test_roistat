@@ -6,9 +6,13 @@ namespace Logs;
 class ParserLogs
 {
     /**
-     * @type array|string
+     * @type string
      */
-    private $fileNames;
+    private $fileName;
+
+    /**
+     * @type array
+     */
     private $result = [
         "views" => 0,
         "urls" => 0,
@@ -23,14 +27,24 @@ class ParserLogs
     ];
 
     /**
-     * @type array|string
+     * @type array[string]
      */
     private $urls = [];
 
-    public function __construct(array $filesNames)
+    /**
+     * @type string
+     */
+    private $queryType;
+
+    /**
+     * @type int
+     */
+    private $currentLine;
+
+    public function __construct($filesName)
     {
         try {
-            $this->fileNames($filesNames);
+            $this->setFileName($filesName);
         } catch (\Exception $e) {
             echo $e->getMessage();
             die();
@@ -38,28 +52,26 @@ class ParserLogs
     }
 
     /**
-     * @param array|string $fileNames
+     * @param array[string] $fileNames
      * @throws \Exception
      */
-    public function fileNames($fileNames)
+    public function setFileName($fileName)
     {
-        foreach ($fileNames as $fileName) {
-            if (!file_exists($fileName)) {
-                throw new \Exception("Wrong name of file: $fileName\n");
-            }
+        if (!file_exists($fileName)) {
+            throw new \Exception("Wrong name of file: $fileName\n");
         }
-        $this->fileNames = $fileNames;
+        $this->fileName = $fileName;
     }
 
     /**
-     * @param string $fileName
      * @throws \Exception
      * @return string
      */
-    public function getJson($fileName)
+    public function getJson()
     {
-        $fd = fopen($fileName, 'r');
+        $fd = fopen($this->fileName, 'r');
         if ($fd) {
+            // don't know how to read file in another way
             while (($logLine = fgets($fd)) !== false) {
                 try {
                     $this->parseLogLine($logLine);
@@ -70,12 +82,15 @@ class ParserLogs
 
                 $this->result["views"] += 1;
             }
-            $this->result["urls"] = count($this->urls);
-            var_dump(json_encode($this->result));
             fclose($fd);
         } else {
-            throw new \Exception("Impossible to read file: $fileName\n");
+            throw new \Exception("Impossible to read file: $this->fileName\n");
         }
+
+        $this->result["urls"] = count($this->urls);
+        $jsonResult = json_encode($this->result, JSON_PRETTY_PRINT);
+
+        return $jsonResult;
     }
 
 
@@ -87,33 +102,58 @@ class ParserLogs
     {
         $pattern = "!.*\"(.+)\" (\d+) (\d+) \"(.+)\" \"(.+)\"!";
 
-        $currLine = $this->result["views"] + 1;
+        $this->currentLine = $this->result["views"] + 1;
         if (!preg_match_all($pattern, $logLine, $allLogParams, PREG_SET_ORDER)) {
             if (count($allLogParams[0]) != 6) {
-                throw new \Exception("Invalid number of log parameters in line {$currLine}\n");
+                throw new \Exception("Invalid number of log parameters in line {$this->currentLine}\n");
             }
         }
         $logParams = array_slice($allLogParams[0], 1);
 
-        $query = $logParams[0];
+        try {
+            $this->saveUrl($logParams, 0);
+            $this->saveStatusCode($logParams, 1);
+            $this->saveTraffic($logParams, 2);
+            $this->saveCrawler($logParams, 4);
+        } catch (\Exception $e) {
+            throw $e;
+        }
+    }
+
+    /**
+     * @param array[string] $logParams
+     * @param int $indx
+     * @throws \Exception
+     */
+    private function saveUrl($logParams, $indx)
+    {
+        $query = $logParams[$indx];
         $queryParams = explode(" ", $query);
 
         if (count($queryParams) != 3) {
-            throw new \Exception("Invalid number of query parameters in line {$currLine}\n");
+            throw new \Exception("Invalid number of query parameters in line {$this->currentLine}\n");
         }
 
-        $queryType = $queryParams[0];
-        if (!in_array($queryType, ["POST", "GET"])) {
-            throw new \Exception("Invalid query type in line {$currLine}\n");
+        $this->queryType = $queryParams[0];
+        if (!in_array($this->queryType, ["POST", "GET"])) {
+            throw new \Exception("Invalid query type in line {$this->currentLine}\n");
         }
 
         $url = $queryParams[1];
         if (!in_array($url, $this->urls))
             $this->urls[] = $url;
+    }
 
-        $statusCode = $logParams[1];
+    /**
+     * @param array[string] $logParams
+     * @param int $indx
+     * @throws \Exception
+     */
+    private function saveStatusCode($logParams, $indx)
+    {
+        $statusCode = $logParams[$indx];
         if (!is_numeric($statusCode) || strlen($statusCode) !== 3) {
-            throw new \Exception("Server's status code is incorrect in line {$currLine}\n");
+            throw new \Exception("Server's status code is incorrect in line {$this->currentLine}\n");
         }
 
         if (key_exists($statusCode, $this->result["statusCodes"])) {
@@ -121,16 +161,32 @@ class ParserLogs
         } else {
             $this->result["statusCodes"][$statusCode] = 1;
         }
+    }
 
-        $traffic = $logParams[2];
+    /**
+     * @param array[string] $logParams
+     * @param int $indx
+     * @throws \Exception
+     */
+    private function saveTraffic($logParams, $indx)
+    {
+        $traffic = $logParams[$indx];
         if (!is_numeric($traffic)) {
-            throw new \Exception("Traffic value is not a number in line {$currLine}\n");
+            throw new \Exception("Traffic value is not a number in line {$this->currentLine}\n");
         }
 
-        if ($queryType === "POST")
+        if ($this->queryType === "POST")
             $this->result["traffic"] += $traffic;
+    }
 
-        $browserInfo = $logParams[4];
+    /**
+     * @param array[string] $logParams
+     * @param int $indx
+     * @throws \Exception
+     */
+    private function saveCrawler($logParams, $indx)
+    {
+        $browserInfo = $logParams[$indx];
         $browserParams = explode(" ", $browserInfo);
 
         $crawler = strtolower($browserParams[5]);
