@@ -32,10 +32,22 @@ try {
 }
 
 
+// hack: convert to opposite value coz if flag exists it's false by default
+$resultIsPrint = !$parserArgs->isPrint();
+
+if ($resultIsPrint) {
+    print($jsonResult . PHP_EOL);
+}
+
 
 $fileNameToSave = $parserArgs->fileNameToSave();
 
-if ($fileNameToSave !== '') {
+if ($fileNameToSave === '') {
+    // hack: check if result has been printed or not
+    if (!$resultIsPrint) {
+        print($jsonResult . PHP_EOL);
+    }
+} else {
     try {
         save($fileNameToSave, $jsonResult);
     } catch (\Exception $e) {
@@ -43,12 +55,7 @@ if ($fileNameToSave !== '') {
     }
 }
 
-// hack: convert to opposite value coz if flag exists it's false by default
-$resultIsPrint = !$parserArgs->isPrint();
 
-if ($resultIsPrint) {
-    print($jsonResult . PHP_EOL);
-}
 
 
 /**
